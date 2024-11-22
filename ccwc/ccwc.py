@@ -7,7 +7,12 @@ import argparse
 import sys
 from contextlib import contextmanager
 
+
 SEPERATOR = "  " # Using double space as seperator for output
+# Commands ENUM
+LINE_COUNT, BYTE_COUNT, WORDS_COUNT, CHAR_COUNT = (
+    0, 1, 2, 3
+)
 
 # Get the command line arguments.
 parser = argparse.ArgumentParser(
@@ -21,10 +26,6 @@ parser.add_argument("-l", "--lines", action="store_true", help="Get the words co
 parser.add_argument("filepath",nargs="?", help="Name of the file to be processed.")
 args = parser.parse_args()
 
-# Commands ENUM
-LINE_COUNT, BYTE_COUNT, WORDS_COUNT, CHAR_COUNT = (
-    0, 1, 2, 3
-)
 
 def validate_file(filepath):
     if not isinstance(filepath, str):
