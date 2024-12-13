@@ -66,7 +66,7 @@ def process_commands(input_stream, commands=None, no_option_selected=False):
         raise Exception("Invalid argument!")
     
     result = [0] * 4
-    for line in input_stream:
+    for line in input_stream: # Lazy loading.
         if commands[LINE_COUNT] or no_option_selected:
             result[LINE_COUNT] += 1
         if commands[WORDS_COUNT] or no_option_selected:
