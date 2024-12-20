@@ -15,6 +15,7 @@ HEADER
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 |                    ARCOUNT                    |
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
 '''
 import random
 import struct
@@ -90,34 +91,103 @@ class ResponseParser:
     def parse(self, response, transaction_id):
         ''' Divides the response into different parts
         and decode each part into an organized data structure.'''
-        self.header = self.get_header(response)
+        current_offset = 0
+        self.header, current_offset = self.get_header(response, current_offset)
+        self.validate_QR()
+
         if transaction_id != self.header[0]:
             raise Exception("Invalid response!")
-        domain_name, current_offset = self.decode_domain(response, 12)
+        domain_name, current_offset = self.decode_domain(response, current_offset)
         answers, current_offset = self.decode_answer(response, current_offset)
-        authorities, current_offset = self.decode_authorities(response, current_offset)
-        additional_sections = self.decode_additional_sections(response, current_offset)
+        # authorities, current_offset = self.decode_authorities(response, current_offset)
+        # additional_sections = self.decode_additional_sections(response, current_offset)
 
-        return domain_name, answers
+        return self.header, domain_name, answers
+    
+    def validate_QR(self):
+        ''' Validates that the recieved QR is 1.'''
+        flag = self.header[1]
+        if not (flag >> 15 & 1):
+            # bring the QR value to least signiicant bit.
+            raise Exception("Invalid QR!")
     
     def decode_answer(self, response, offset):
         ''' Decodes the answer from the response and moves the offset
-        as required.'''
+        as required.
+        ANSWER
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        |                                               |
+        /                                               /
+        /                      NAME                     /
+        |                                               |
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        |                      TYPE                     |
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        |                     CLASS                     |
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        |                      TTL                      |
+        |                                               |
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        |                   RDLENGTH                    |
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+        /                     RDATA                     /
+        /                                               /
+        +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+        '''
+        n_answers = self.header[3]
+        answers = []
+
+        for _ in range(n_answers):
+            name = response[offset: offset+2]
+            # if first two bits are set, then decompression is required.
+            if name[0] & 0xC0 == 0xC0:
+                pointer = (name[0] & 0x3F) << 8 | name[1]
+                name, _ = self.decode_domain(response, pointer)
+                offset += 2 # Skip the pointer as we dont need domain names
+            else:
+                while response[offset] != 0x00:
+                    offset += 1
+                offset += 1
+
+            rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", response[offset: offset+10])
+            offset += 10
+
+            rdata = response[offset: offset+rdlength]
+
+            if rtype == 1:
+                rdata = "".join(map(str, socket.inet_ntoa(rdata)))
+            elif rtype == 5:
+                rdata = self.decode_domain(response, offset)[0]
+
+            offset += rdlength
+
+            answers.append({
+                "name": name,
+                "rtype": rtype,
+                "rclass": rclass,
+                "ttl": ttl,
+                "rdlength": rdlength,
+                "rdata": rdata
+            })
+
+        return answers, offset
 
     def decode_authorities(self, response, offset):
         ''' Decodes the authorities from the response and moves the offset
         as required.'''
+        n_authorities = self.header[4]
 
     def decode_additional_sections(self, response, offset):
         ''' Decodes the additional section from response and moves the offset
         as required.'''
+        n_sections = self.header[5]
 
 
     def decode_domain(self, response, offset):
         domain = []
         while True:
             length = response[offset]
-            if length == 0: # 0 length represents the end of the domain name
+            if length == 0x00: # 0 length represents the end of the domain name
                 offset += 1
                 break
             elif length & 0xC0 == 0xC0:
@@ -126,18 +196,20 @@ class ResponseParser:
                 domain.append(self.decode_domain(response, pointer)[0])
                 break
             else:
-                offset += 1
+                offset += 1 # Skip the length offset and move to next first character
+                # Read till length and decode it
                 domain.append(response[offset:offset + length].decode("utf-8"))
                 offset += length
 
-        return ".".join(domain), offset
+        # Adding 4 to offset to skip QTYPE and QCLASS associated with domain.
+        return ".".join(domain), offset + 4
 
-    def get_header(self, response):
+    def get_header(self, response, offset):
         ''' Reads and parse the header.'''
         return struct.unpack(
             "!HHHHHH",
-            response[:12] # First 12 bits represent the header.
-        )
+            response[offset: offset + 12] # First 12 bytes represent the header.
+        ), offset + 12
 
 if __name__ == "__main__":
     message_generator = MessageGenerator()
