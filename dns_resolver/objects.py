@@ -99,10 +99,10 @@ class ResponseParser:
             raise Exception("Invalid response!")
         domain_name, current_offset = self.decode_domain(response, current_offset)
         answers, current_offset = self.decode_answer(response, current_offset)
-        # authorities, current_offset = self.decode_authorities(response, current_offset)
-        # additional_sections = self.decode_additional_sections(response, current_offset)
+        authorities, current_offset = self.decode_authorities(response, current_offset)
+        additional_sections, current_offset = self.decode_additional_sections(response, current_offset)
 
-        return self.header, domain_name, answers
+        return self.header, domain_name, answers, authorities, additional_sections
     
     def validate_QR(self):
         ''' Validates that the recieved QR is 1.'''
@@ -110,11 +110,29 @@ class ResponseParser:
         if not (flag >> 15 & 1):
             # bring the QR value to least signiicant bit.
             raise Exception("Invalid QR!")
-    
+        
+
     def decode_answer(self, response, offset):
-        ''' Decodes the answer from the response and moves the offset
+        ''' Decodes the answer '''
+        n_answers = self.header[3]
+        return self.decode(response, offset, n_answers)
+
+    def decode_authorities(self, response, offset):
+        ''' Decodes the authorities from the response and moves the offset
+        as required.'''
+        n_authorities = self.header[4]
+        return self.decode(response, offset, n_authorities)
+
+    def decode_additional_sections(self, response, offset):
+        ''' Decodes the additional section from response and moves the offset
+        as required.'''
+        n_sections = self.header[5]
+        return self.decode(response, offset, n_sections)
+    
+    def decode(self, response, offset, n):
+        ''' Decodes the portion from the response and moves the offset
         as required.
-        ANSWER
+        ANSWERS, ADDITIONAL_SECTION, AUTHORITIES
         +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
         |                                               |
         /                                               /
@@ -134,10 +152,9 @@ class ResponseParser:
         /                                               /
         +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
         '''
-        n_answers = self.header[3]
-        answers = []
+        results = []
 
-        for _ in range(n_answers):
+        for _ in range(n):
             name = response[offset: offset+2]
             # if first two bits are set, then decompression is required.
             if name[0] & 0xC0 == 0xC0:
@@ -161,7 +178,7 @@ class ResponseParser:
 
             offset += rdlength
 
-            answers.append({
+            results.append({
                 "name": name,
                 "rtype": rtype,
                 "rclass": rclass,
@@ -170,18 +187,7 @@ class ResponseParser:
                 "rdata": rdata
             })
 
-        return answers, offset
-
-    def decode_authorities(self, response, offset):
-        ''' Decodes the authorities from the response and moves the offset
-        as required.'''
-        n_authorities = self.header[4]
-
-    def decode_additional_sections(self, response, offset):
-        ''' Decodes the additional section from response and moves the offset
-        as required.'''
-        n_sections = self.header[5]
-
+        return results, offset
 
     def decode_domain(self, response, offset):
         domain = []
