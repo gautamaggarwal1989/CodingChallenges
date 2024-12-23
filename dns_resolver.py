@@ -21,6 +21,21 @@ import random
 import struct
 import socket
 import re
+import copy
+
+
+NAMESERVERS = [
+    "198.41.0.4",
+    "199.9.14.201",
+    "192.33.4.12",
+    "199.7.91.13",
+    "192.203.230.10",
+    "192.5.5.241",
+    "192.112.36.4",
+    "198.97.190.53",
+    "192.36.148.17",
+    "192.58.128.30"
+]
 
 
 class MessageGenerator:
@@ -95,43 +110,24 @@ class ResponseParser:
         ''' Divides the response into different parts
         and decode each part into an organized data structure.'''
         current_offset = 0
-        self.header, current_offset = self.get_header(response, current_offset)
-        self.validate_QR()
+        header, current_offset = self.get_header(response, current_offset)
+        self.validate_QR(header[1])
 
-        if transaction_id != self.header[0]:
+        if transaction_id != header[0]:
             raise Exception("Invalid response!")
         domain_name, current_offset = self.decode_domain(response, current_offset)
-        answers, current_offset = self.decode_answer(response, current_offset)
-        authorities, current_offset = self.decode_authorities(response, current_offset)
-        additional_sections, current_offset = self.decode_additional_sections(response, current_offset)
+        answers, current_offset = self.decode(response, current_offset, header[3])
+        authorities, current_offset = self.decode(response, current_offset, header[4])
+        additional_sections, current_offset = self.decode(response, current_offset, header[5])
 
-        return self.header, domain_name, answers, authorities, additional_sections
+        return header, domain_name, answers, authorities, additional_sections
     
-    def validate_QR(self):
+    def validate_QR(self, flag):
         ''' Validates that the recieved QR is 1.'''
-        flag = self.header[1]
         if not (flag >> 15 & 1):
             # bring the QR value to least signiicant bit.
             raise Exception("Invalid QR!")
-        
 
-    def decode_answer(self, response, offset):
-        ''' Decodes the answer '''
-        n_answers = self.header[3]
-        return self.decode(response, offset, n_answers)
-
-    def decode_authorities(self, response, offset):
-        ''' Decodes the authorities from the response and moves the offset
-        as required.'''
-        n_authorities = self.header[4]
-        return self.decode(response, offset, n_authorities)
-
-    def decode_additional_sections(self, response, offset):
-        ''' Decodes the additional section from response and moves the offset
-        as required.'''
-        n_sections = self.header[5]
-        return self.decode(response, offset, n_sections)
-    
     def decode(self, response, offset, n):
         ''' Decodes the portion from the response and moves the offset
         as required.
@@ -232,18 +228,7 @@ if __name__ == "__main__":
         domain_name = input("Please enter a valid domain name:- ")
 
     # using stack to keep track of all the server used
-    nameserver_stack = [
-        "198.41.0.4",
-        "199.9.14.201",
-        "192.33.4.12",
-        "199.7.91.13",
-        "192.203.230.10",
-        "192.5.5.241",
-        "192.112.36.4",
-        "198.97.190.53",
-        "192.36.148.17",
-        "192.58.128.30"
-    ]
+    nameserver_stack = copy.deepcopy(NAMESERVERS)
 
     name_server_client = NameServerClient()
     message_generator = MessageGenerator()
@@ -265,12 +250,10 @@ if __name__ == "__main__":
         response = response_parser.parse(
             response, message_generator.header_id)
         
-        rcode = response[0][1] & 0x0F
+        rcode = response[0][1] & 0x0F # Get the last four bits of the header.
         if rcode == 3: # Domain does not exist
             raise Exception(
                 "Non existent domain. No IP address is connected to this domain.")
-        
-        print(response)
 
         resolved_addresses = response[2]
         if resolved_addresses != []:
@@ -278,18 +261,7 @@ if __name__ == "__main__":
             if address['rtype'] == 1: break
             else:
                 domain_name = address['rdata']
-                nameserver_stack = [
-                    "198.41.0.4",
-                    "199.9.14.201",
-                    "192.33.4.12",
-                    "199.7.91.13",
-                    "192.203.230.10",
-                    "192.5.5.241",
-                    "192.112.36.4",
-                    "198.97.190.53",
-                    "192.36.148.17",
-                    "192.58.128.30"
-                ]
+                nameserver_stack = copy.deepcopy(NAMESERVERS)
         else:
             for address in response[3]:
                 nameserver_stack.append(address['rdata'])
@@ -297,4 +269,3 @@ if __name__ == "__main__":
     # Print the address
     for answer in resolved_addresses:
         print(answer['rdata'])
-
