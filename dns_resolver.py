@@ -20,17 +20,20 @@ HEADER
 import random
 import struct
 import socket
+import re
 
 
 class MessageGenerator:
     ''' Creates the message in the required byte format.
     '''
 
+    def __init__(self):
+        self.header_id = random.randint(0, 65535)
+
     def create_header(self):
         ''' Creates the header for message'''
         # Saving in self for later match with response
-        self.header_id = random.randint(0, 65535)
-        flags = 0x0100
+        flags = 0x0000
         questions = 1
 
         answer_rrs = 0
@@ -66,10 +69,10 @@ class NameServerClient:
     process the ip address associated with domain name.
     We are using google dns server to resolve the names.'''
 
-    UDP_IP = "8.8.8.8"
     UDP_PORT = 53
 
-    def request_dns_server(self, message):
+    @classmethod
+    def request_dns_server(self, message, udp_ip):
         
         sock = socket.socket(
             socket.AF_INET,
@@ -77,7 +80,7 @@ class NameServerClient:
         )
 
         ## Make requests to recieve data.
-        sock.sendto(message, (self.UDP_IP, self.UDP_PORT))
+        sock.sendto(message, (udp_ip, self.UDP_PORT))
 
         response, addr = sock.recvfrom(512)
         return response
@@ -173,7 +176,7 @@ class ResponseParser:
 
             if rtype == 1:
                 rdata = "".join(map(str, socket.inet_ntoa(rdata)))
-            elif rtype == 5:
+            elif rtype in (5, 6, 2):
                 rdata = self.decode_domain(response, offset)[0]
 
             offset += rdlength
@@ -217,18 +220,81 @@ class ResponseParser:
             response[offset: offset + 12] # First 12 bytes represent the header.
         ), offset + 12
 
+
+def valid_domain(domain_name):
+    pattern = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$')
+    return bool(pattern.match(domain_name))
+
+
 if __name__ == "__main__":
-    message_generator = MessageGenerator()
-    message = message_generator.create_message(
-        domain_name='dns.google.com'
-    )
+    domain_name = input("Enter the name of domain:- ")
+    while not valid_domain(domain_name):
+        domain_name = input("Please enter a valid domain name:- ")
+
+    # using stack to keep track of all the server used
+    nameserver_stack = [
+        "198.41.0.4",
+        "199.9.14.201",
+        "192.33.4.12",
+        "199.7.91.13",
+        "192.203.230.10",
+        "192.5.5.241",
+        "192.112.36.4",
+        "198.97.190.53",
+        "192.36.148.17",
+        "192.58.128.30"
+    ]
 
     name_server_client = NameServerClient()
-    response = name_server_client.request_dns_server(message)
-
+    message_generator = MessageGenerator()
     response_parser = ResponseParser()
-    data = response_parser.parse(
-        response, message_generator.header_id)
 
-    print(data)
+    while True:
+        if not nameserver_stack: raise Exception("Name servers not available!")
+
+        nameserver = nameserver_stack.pop()
+        print(f"Querying {nameserver} for {domain_name}")
+
+        message = message_generator.create_message(
+            domain_name=domain_name
+        )
+
+        response = name_server_client.request_dns_server(message, nameserver)
+
+        # Parse the response to check if the domain is available
+        response = response_parser.parse(
+            response, message_generator.header_id)
+        
+        rcode = response[0][1] & 0x0F
+        if rcode == 3: # Domain does not exist
+            raise Exception(
+                "Non existent domain. No IP address is connected to this domain.")
+        
+        print(response)
+
+        resolved_addresses = response[2]
+        if resolved_addresses != []:
+            address = resolved_addresses[0]
+            if address['rtype'] == 1: break
+            else:
+                domain_name = address['rdata']
+                nameserver_stack = [
+                    "198.41.0.4",
+                    "199.9.14.201",
+                    "192.33.4.12",
+                    "199.7.91.13",
+                    "192.203.230.10",
+                    "192.5.5.241",
+                    "192.112.36.4",
+                    "198.97.190.53",
+                    "192.36.148.17",
+                    "192.58.128.30"
+                ]
+        else:
+            for address in response[3]:
+                nameserver_stack.append(address['rdata'])
+
+    # Print the address
+    for answer in resolved_addresses:
+        print(answer['rdata'])
 
