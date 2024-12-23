@@ -40,14 +40,12 @@ NAMESERVERS = [
 
 class MessageGenerator:
     ''' Creates the message in the required byte format.
-    '''
-
-    def __init__(self):
-        self.header_id = random.randint(0, 65535)
+    '''        
 
     def create_header(self):
         ''' Creates the header for message'''
         # Saving in self for later match with response
+        self.header_id = random.randint(0, 65535)
         flags = 0x0000
         questions = 1
 
