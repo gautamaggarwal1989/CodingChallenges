@@ -1,6 +1,8 @@
 ''' Module containing logic for conversion to byte message to
 and from the dns server.
 
+https://codingchallenges.fyi/challenges/challenge-dns-resolver
+
 HEADER
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 |                      ID                       |
