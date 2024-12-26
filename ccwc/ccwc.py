@@ -44,7 +44,9 @@ def get_input_stream(filepath=None):
 
 def process_commands(input_stream, commands=None, no_option_selected=False):
     ''' This function processes the commands and expects
-    input type as a list of commands.'''
+    input type as a list of commands.
+    '''
+    #TODO Optimize this for large files
     if not isinstance(commands, list):
         raise Exception("Invalid argument!")
     
