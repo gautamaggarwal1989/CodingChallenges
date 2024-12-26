@@ -53,7 +53,7 @@ This repository contains solutions to various coding challenges designed for pra
 
 1. **Clone the Repository**:
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:gautamaggarwal1989/CodingChallenges.git
    cd CodingChallenges
    ```
    
