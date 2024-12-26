@@ -7,6 +7,7 @@ import argparse
 import sys
 from contextlib import contextmanager
 
+from pathlib import Path
 
 SEPERATOR = "  " # Using double space as seperator for output
 # Commands ENUM
@@ -27,37 +28,19 @@ parser.add_argument("filepath",nargs="?", help="Name of the file to be processed
 args = parser.parse_args()
 
 
-def validate_file(filepath):
-    if not isinstance(filepath, str):
-        raise ValueError("Invalid Input for the filepath.")
-
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"File {filepath} does not exist.")
-
 @contextmanager
 def get_input_stream(filepath=None):
     if not sys.stdin.isatty():
         yield sys.stdin.buffer
     elif filepath:
-        filepath = get_absolute_path(args.filepath)
-        # Validate the file input
-        validate_file(filepath)
+        filepath = Path(args.filepath).resolve()
+        if not filepath.is_file():
+            raise FileNotFoundError(f"{filepath.name}: open: No such file or directory")
 
         with open(filepath, 'rb') as file:
             yield file
     else:
-        raise Exception('No input stream provided!')
-    
-def get_absolute_path(filepath):
-    if not os.path.exists(filepath):
-        file_parts = filepath.split("/")
-        if file_parts == 1:
-            filename = file_parts[-1]
-            return os.path.abspath(filename)
-
-        raise FileNotFoundError(f"File {filepath} does not exist.")
-
-    return filepath
+        raise Exception('open: No input stream provided')
 
 def process_commands(input_stream, commands=None, no_option_selected=False):
     ''' This function processes the commands and expects
@@ -79,7 +62,6 @@ def process_commands(input_stream, commands=None, no_option_selected=False):
             result[BYTE_COUNT] += len(line)
 
     return result
-    
 
 if __name__ == "__main__":
     try:
@@ -122,4 +104,4 @@ if __name__ == "__main__":
 
         print(output)
     except Exception as e:
-        print(f"Error:- {str(e)}")
+        print(f"ccwc: {str(e)}")
