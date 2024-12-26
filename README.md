@@ -4,7 +4,7 @@ This repository contains solutions to various coding challenges designed for pra
 
 ---
 
-## **Challenges**
+## **Challenges Documentation**
 1. [WC Tool (Word Count) in Python](ccwc/README.md)
 2. [DNS Resolver](dns_resolver/README.md)
 
