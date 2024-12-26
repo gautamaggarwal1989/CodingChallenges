@@ -1,6 +1,6 @@
 # **CodingChallenges**
 
-This repository contains solutions to various coding challenges designed for practice and skill enhancement. Each challenge focuses on a specific concept or area of programming. 
+This repository contains solutions to various coding challenges designed for practice and skill enhancement. Each challenge focuses on a specific concept or area of programming. Thanks to [john crickett](https://www.linkedin.com/in/johncrickett/) for adding these challenges on [Coding Challenges](https://codingchallenges.fyi/challenges).
 
 ---
 
